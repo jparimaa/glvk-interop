@@ -8,6 +8,13 @@ class GLFWwindow;
 class Context final
 {
 public:
+    struct WaitAndSignalInfo
+    {
+        std::vector<VkPipelineStageFlags> waitStages;
+        std::vector<VkSemaphore> waitSemaphores;
+        std::vector<VkSemaphore> signalSemaphores;
+    };
+
     Context();
     ~Context();
 
@@ -20,7 +27,7 @@ public:
 
     bool update();
     uint32_t acquireNextSwapchainImage();
-    void submitCommandBuffers(const std::vector<VkCommandBuffer>& commandBuffers);
+    void submitCommandBuffers(const std::vector<VkCommandBuffer>& commandBuffers, WaitAndSignalInfo waitAndSignalInfo);
 
 private:
     void initGLFW();

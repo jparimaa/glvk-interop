@@ -5,11 +5,11 @@
 
 namespace
 {
-using Vertex = std::array<float, 3>;
+using Vertex = std::array<float, 5>;
 const std::array<Vertex, 3> c_vertexData{
-    std::array<float, 3>{-0.5f, -0.5f, 0.0f}, //
-    std::array<float, 3>{0.0f, 0.5f, 0.0f}, //
-    std::array<float, 3>{0.5f, -0.5f, 0.0f} //
+    Vertex{-0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, //
+    Vertex{0.0f, 0.5f, 0.0f, 0.5f, 1.0f}, //
+    Vertex{0.5f, -0.5f, 0.0f, 1.0f, 0.0f} //
 };
 
 const std::array<uint32_t, 3> c_indexData{0, 1, 2};
@@ -17,8 +17,9 @@ const std::array<uint32_t, 3> c_indexData{0, 1, 2};
 const std::array<float, 4> c_colorData{0.2f, 0.4f, 0.7f, 1.0f};
 } // namespace
 
-VKRenderer::VKRenderer(Context& context) :
+VKRenderer::VKRenderer(Context& context, Interop& interop) :
     m_context(context),
+    m_interop(interop),
     m_device(context.getDevice())
 {
     createRenderPass();
@@ -110,6 +111,8 @@ bool VKRenderer::render()
 
     vkBeginCommandBuffer(cb, &beginInfo);
 
+    m_interop.transformSharedImageForVKRead(cb);
+
     renderPassInfo.framebuffer = m_framebuffers[imageIndex];
 
     vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -122,9 +125,16 @@ bool VKRenderer::render()
 
     vkCmdEndRenderPass(cb);
 
+    m_interop.transformSharedImageForGLWrite(cb);
+
     VK_CHECK(vkEndCommandBuffer(cb));
 
-    m_context.submitCommandBuffers({cb});
+    Context::WaitAndSignalInfo waitAndSignalInfo{};
+    waitAndSignalInfo.waitStages = {VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
+    waitAndSignalInfo.waitSemaphores = {m_interop.getGLCompleteSemaphore()};
+    waitAndSignalInfo.signalSemaphores = {m_interop.getVKReadySemaphore()};
+
+    m_context.submitCommandBuffers({cb}, waitAndSignalInfo);
 
     return true;
 }
@@ -315,7 +325,14 @@ void VKRenderer::createDescriptorSetLayout()
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
-    const std::vector<VkDescriptorSetLayoutBinding> bindings{uboLayoutBinding};
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+    const std::vector<VkDescriptorSetLayoutBinding> bindings{uboLayoutBinding, samplerLayoutBinding};
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ui32Size(bindings);
@@ -335,21 +352,26 @@ void VKRenderer::createGraphicsPipeline()
 
     VkVertexInputBindingDescription vertexDescription{};
     vertexDescription.binding = 0;
-    vertexDescription.stride = sizeof(float) * 3;
+    vertexDescription.stride = sizeof(Vertex);
     vertexDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    VkVertexInputAttributeDescription attributeDescription{};
-    attributeDescription.binding = 0;
-    attributeDescription.location = 0;
-    attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescription.offset = 0;
+    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+    attributeDescriptions[0].binding = 0;
+    attributeDescriptions[0].location = 0;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].offset = 0;
+
+    attributeDescriptions[1].binding = 0;
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[1].offset = 3 * sizeof(float);
 
     VkPipelineVertexInputStateCreateInfo vertexInputState{};
     vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputState.vertexBindingDescriptionCount = 1;
     vertexInputState.pVertexBindingDescriptions = &vertexDescription;
-    vertexInputState.vertexAttributeDescriptionCount = 1;
-    vertexInputState.pVertexAttributeDescriptions = &attributeDescription;
+    vertexInputState.vertexAttributeDescriptionCount = ui32Size(attributeDescriptions);
+    vertexInputState.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
     inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -482,9 +504,11 @@ void VKRenderer::createSampler()
 
 void VKRenderer::createDescriptorPool()
 {
-    std::array<VkDescriptorPoolSize, 1> poolSizes{};
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = 1;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -542,7 +566,7 @@ void VKRenderer::createUniformBuffer()
 
 void VKRenderer::updateDescriptorSet()
 {
-    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = m_uniformBuffer;
@@ -556,6 +580,19 @@ void VKRenderer::updateDescriptorSet()
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[0].descriptorCount = 1;
     descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = m_interop.getSharedImageView();
+    imageInfo.sampler = m_sampler;
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = m_descriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pImageInfo = &imageInfo;
 
     vkUpdateDescriptorSets(m_device, ui32Size(descriptorWrites), descriptorWrites.data(), 0, nullptr);
 }

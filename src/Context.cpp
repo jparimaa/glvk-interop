@@ -111,19 +111,23 @@ uint32_t Context::acquireNextSwapchainImage()
     return m_imageIndex;
 }
 
-void Context::submitCommandBuffers(const std::vector<VkCommandBuffer>& commandBuffers)
+void Context::submitCommandBuffers(const std::vector<VkCommandBuffer>& commandBuffers, WaitAndSignalInfo waitAndSignalInfo)
 {
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    CHECK(waitAndSignalInfo.waitSemaphores.size() == waitAndSignalInfo.waitStages.size());
+
+    waitAndSignalInfo.waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    waitAndSignalInfo.waitSemaphores.push_back(m_imageAvailable);
+    waitAndSignalInfo.signalSemaphores.push_back(m_renderFinished);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &m_imageAvailable;
-    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.waitSemaphoreCount = ui32Size(waitAndSignalInfo.waitSemaphores);
+    submitInfo.pWaitSemaphores = waitAndSignalInfo.waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitAndSignalInfo.waitStages.data();
     submitInfo.commandBufferCount = ui32Size(commandBuffers);
     submitInfo.pCommandBuffers = commandBuffers.data();
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &m_renderFinished;
+    submitInfo.signalSemaphoreCount = ui32Size(waitAndSignalInfo.signalSemaphores);
+    submitInfo.pSignalSemaphores = waitAndSignalInfo.signalSemaphores.data();
 
     VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_imageIndex]));
 

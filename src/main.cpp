@@ -14,13 +14,13 @@ int main(void)
 
     Context context;
     Interop interop(context);
-    VKRenderer vkRenderer(context);
-    GLRenderer glRenderer;
+    VKRenderer vkRenderer(context, interop);
+    GLRenderer glRenderer(interop);
 
     bool running = true;
     while (running)
     {
-        running = vkRenderer.render() && glRenderer.render();
+        running = glRenderer.render() && vkRenderer.render();
     }
 
     glfwTerminate();

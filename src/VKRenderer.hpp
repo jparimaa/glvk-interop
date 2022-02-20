@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Context.hpp"
+#include "Interop.hpp"
 #include <vector>
 
 class VKRenderer final
 {
 public:
-    VKRenderer(Context& context);
+    VKRenderer(Context& context, Interop& interop);
     ~VKRenderer();
 
     bool render();
@@ -27,6 +28,7 @@ private:
     void allocateCommandBuffers();
 
     Context& m_context;
+    Interop& m_interop;
     VkDevice m_device;
 
     VkRenderPass m_renderPass;
