@@ -17,6 +17,19 @@ void printInstanceLayers()
     }
 }
 
+void printInstanceExtensions()
+{
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+    for (const auto& extension : extensions)
+    {
+        printf("%s\n", extension.extensionName);
+    }
+}
+
 void printDeviceExtensions(VkPhysicalDevice physicalDevice)
 {
     uint32_t extensionCount;
@@ -188,7 +201,7 @@ SingleTimeCommand beginSingleTimeCommands(VkCommandPool commandPool, VkDevice de
     return command;
 }
 
-void endSingleTimeCommands(VkQueue queue, SingleTimeCommand command)
+void endSingleTimeCommands(VkQueue queue, SingleTimeCommand command, VkSemaphore signalSemaphore)
 {
     VK_CHECK(vkEndCommandBuffer(command.commandBuffer));
 
@@ -196,6 +209,8 @@ void endSingleTimeCommands(VkQueue queue, SingleTimeCommand command)
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &command.commandBuffer;
+    submitInfo.signalSemaphoreCount = signalSemaphore != VK_NULL_HANDLE ? 1 : 0;
+    submitInfo.pSignalSemaphores = &signalSemaphore;
 
     VK_CHECK(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
     VK_CHECK(vkQueueWaitIdle(queue));

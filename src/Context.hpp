@@ -11,6 +11,7 @@ public:
     Context();
     ~Context();
 
+    VkInstance getInstance() const;
     VkPhysicalDevice getPhysicalDevice() const;
     VkDevice getDevice() const;
     const std::vector<VkImage>& getSwapchainImages() const;

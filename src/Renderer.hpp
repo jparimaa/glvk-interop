@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Context.hpp"
+#include <windows.h>
 #include <vector>
 
 class Renderer final
@@ -18,12 +19,15 @@ private:
     void createFramebuffers();
     void createDescriptorSetLayout();
     void createGraphicsPipeline();
+    void createSampler();
     void createDescriptorPool();
     void createDescriptorSet();
     void createUniformBuffer();
     void updateDescriptorSet();
     void createVertexAndIndexBuffer();
     void allocateCommandBuffers();
+    void createInteropSemaphores();
+    void createInteropTexture();
 
     Context& m_context;
     VkDevice m_device;
@@ -37,6 +41,7 @@ private:
     VkDescriptorSetLayout m_descriptorSetLayout;
     VkPipelineLayout m_pipelineLayout;
     VkPipeline m_graphicsPipeline;
+    VkSampler m_sampler;
     VkDescriptorPool m_descriptorPool;
     VkDescriptorSet m_descriptorSet;
     VkBuffer m_uniformBuffer;
@@ -46,4 +51,11 @@ private:
     VkBuffer m_indexBuffer;
     VkDeviceMemory m_indexBufferMemory;
     std::vector<VkCommandBuffer> m_commandBuffers;
+
+    VkSemaphore m_glComplete;
+    VkSemaphore m_glReady;
+    VkImage m_sharedImage;
+    VkDeviceMemory m_sharedImageMemory;
+    HANDLE m_memoryHandle;
+    VkImageView m_sharedImageView;
 };

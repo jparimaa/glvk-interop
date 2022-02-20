@@ -67,6 +67,11 @@ Context::~Context()
     vkDestroyInstance(m_instance, nullptr);
 }
 
+VkInstance Context::getInstance() const
+{
+    return m_instance;
+}
+
 VkPhysicalDevice Context::getPhysicalDevice() const
 {
     return m_physicalDevice;
@@ -215,6 +220,7 @@ void Context::enumeratePhysicalDevice()
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
 
+    m_physicalDevice = VK_NULL_HANDLE;
     for (VkPhysicalDevice device : devices)
     {
         if (isDeviceSuitable(device, m_surface))
@@ -225,7 +231,6 @@ void Context::enumeratePhysicalDevice()
     }
     CHECK(m_physicalDevice != VK_NULL_HANDLE);
 
-    //printDeviceExtensions(m_physicalDevice);
     vkGetPhysicalDeviceProperties(m_physicalDevice, &m_physicalDeviceProperties);
     printPhysicalDeviceName(m_physicalDeviceProperties);
 }
