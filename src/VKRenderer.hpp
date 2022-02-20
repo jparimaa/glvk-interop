@@ -1,14 +1,13 @@
 #pragma once
 
 #include "Context.hpp"
-#include <windows.h>
 #include <vector>
 
-class Renderer final
+class VKRenderer final
 {
 public:
-    Renderer(Context& context);
-    ~Renderer();
+    VKRenderer(Context& context);
+    ~VKRenderer();
 
     bool render();
 
@@ -26,8 +25,6 @@ private:
     void updateDescriptorSet();
     void createVertexAndIndexBuffer();
     void allocateCommandBuffers();
-    void createInteropSemaphores();
-    void createInteropTexture();
 
     Context& m_context;
     VkDevice m_device;
@@ -51,11 +48,4 @@ private:
     VkBuffer m_indexBuffer;
     VkDeviceMemory m_indexBufferMemory;
     std::vector<VkCommandBuffer> m_commandBuffers;
-
-    VkSemaphore m_glComplete;
-    VkSemaphore m_glReady;
-    VkImage m_sharedImage;
-    VkDeviceMemory m_sharedImageMemory;
-    HANDLE m_memoryHandle;
-    VkImageView m_sharedImageView;
 };

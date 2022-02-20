@@ -1,7 +1,8 @@
 #include "Context.hpp"
-#include "Renderer.hpp"
-#include "Utils.hpp"
+#include "Interop.hpp"
+#include "VKRenderer.hpp"
 #include "GLRenderer.hpp"
+#include "Utils.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -12,13 +13,14 @@ int main(void)
     CHECK(glfwInitialized == GLFW_TRUE);
 
     Context context;
-    Renderer renderer(context);
+    Interop interop(context);
+    VKRenderer vkRenderer(context);
     GLRenderer glRenderer;
 
     bool running = true;
     while (running)
     {
-        running = renderer.render() && glRenderer.render();
+        running = vkRenderer.render() && glRenderer.render();
     }
 
     glfwTerminate();
