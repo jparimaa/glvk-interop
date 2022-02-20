@@ -155,12 +155,14 @@ void Interop::createInteropSemaphores()
     VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_glCompleteSemaphore));
     VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_vulkanCompleteSemaphore));
 
+    // VkSemaphoreGetFdInfoKHR for Linux
     VkSemaphoreGetWin32HandleInfoKHR semaphoreGetHandleInfo{};
     semaphoreGetHandleInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR;
     semaphoreGetHandleInfo.pNext = nullptr;
     semaphoreGetHandleInfo.semaphore = VK_NULL_HANDLE;
     semaphoreGetHandleInfo.handleType = compatibleSemaphoreType;
 
+    // vkGetSemaphoreFdKHR for Linux
     auto vkGetSemaphoreWin32HandleKHRAddr = vkGetInstanceProcAddr(m_context.getInstance(), "vkGetSemaphoreWin32HandleKHR");
     auto vkGetSemaphoreWin32HandleKHR = PFN_vkGetSemaphoreWin32HandleKHR(vkGetSemaphoreWin32HandleKHRAddr);
     CHECK(vkGetSemaphoreWin32HandleKHR);
@@ -174,10 +176,13 @@ void Interop::createInteropSemaphores()
 
 void Interop::createInteropTexture()
 {
+    // VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR for Linux
+    const VkExternalMemoryHandleTypeFlags handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+
     { // Create Image
         VkExternalMemoryImageCreateInfo externalMemoryCreateInfo{};
         externalMemoryCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-        externalMemoryCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+        externalMemoryCreateInfo.handleTypes = handleType;
 
         VkImageCreateInfo imageCreateInfo{};
         imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -201,7 +206,7 @@ void Interop::createInteropTexture()
         VkExportMemoryAllocateInfo exportAllocInfo{};
         exportAllocInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
         exportAllocInfo.pNext = nullptr;
-        exportAllocInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+        exportAllocInfo.handleTypes = handleType;
 
         const MemoryTypeResult memoryTypeResult = findMemoryType(m_context.getPhysicalDevice(), memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         CHECK(memoryTypeResult.found);
@@ -218,6 +223,7 @@ void Interop::createInteropTexture()
     }
 
     { // Get memory handle
+        // vkGetMemoryFdKHR for Linux
         auto vkGetMemoryWin32HandleKHRAddr = vkGetInstanceProcAddr(m_context.getInstance(), "vkGetMemoryWin32HandleKHR");
         auto vkGetMemoryWin32HandleKHR = PFN_vkGetMemoryWin32HandleKHR(vkGetMemoryWin32HandleKHRAddr);
         CHECK(vkGetMemoryWin32HandleKHR);
